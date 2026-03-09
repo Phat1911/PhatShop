@@ -1,0 +1,22 @@
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Binaries
+*.exe
+*.test
+
+# Go build cache
+/vendor/
+
+# Storage (user uploads, receipts)
+storage/
+
+# Uploads (product files, thumbnails)
+uploads/
+
+# IDE
+.idea/
+.vscode/
+*.swp
