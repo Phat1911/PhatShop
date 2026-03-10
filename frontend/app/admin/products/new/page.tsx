@@ -1,6 +1,6 @@
 'use client';
 
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -14,6 +14,7 @@ const TYPES = [
 
 export default function NewProductPage() {
   const router = useRouter();
+  const qc = useQueryClient();
   const [form, setForm] = useState({
     title: '', description: '', product_type: 'image', price: '', category_id: '', tags: '',
   });
@@ -40,6 +41,8 @@ export default function NewProductPage() {
     },
     onSuccess: () => {
       toast.success('Tạo sản phẩm thành công!');
+      qc.invalidateQueries({ queryKey: ['admin-products'] });
+      qc.invalidateQueries({ queryKey: ['products'] });
       router.push('/admin/products');
     },
     onError: (err: unknown) => {

@@ -8,7 +8,7 @@ import { useAuthStore } from '@/lib/store';
 import { api } from '@/lib/api';
 
 const queryClient = new QueryClient({
-  defaultOptions: { queries: { retry: 1, staleTime: 30000 } },
+  defaultOptions: { queries: { retry: 1, staleTime: 0 } },
 });
 
 function AuthInitializer() {
