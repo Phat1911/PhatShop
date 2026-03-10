@@ -3,12 +3,14 @@ package handlers
 import (
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"os"
 	"path/filepath"
 	"phatshop-backend/internal/config"
 	"phatshop-backend/internal/models"
 	"phatshop-backend/internal/repository"
+	"phatshop-backend/internal/storage"
 	"regexp"
 	"strconv"
 	"strings"
@@ -23,6 +25,7 @@ type AdminHandler struct {
 	orders     *repository.OrderRepo
 	users      *repository.UserRepo
 	cfg        *config.Config
+	storage    *storage.Client // nil when S3 not configured (local dev fallback)
 }
 
 func NewAdminHandler(
@@ -31,6 +34,7 @@ func NewAdminHandler(
 	orders *repository.OrderRepo,
 	users *repository.UserRepo,
 	cfg *config.Config,
+	storage *storage.Client,
 ) *AdminHandler {
 	return &AdminHandler{
 		products:   products,
@@ -38,6 +42,7 @@ func NewAdminHandler(
 		orders:     orders,
 		users:      users,
 		cfg:        cfg,
+		storage:    storage,
 	}
 }
 
@@ -89,29 +94,55 @@ func (h *AdminHandler) CreateProduct(c *gin.Context) {
 	defer productFile.Close()
 
 	fileName := safeName(header.Filename)
-	storageDir := filepath.Join(h.cfg.StorageDir, "products", productID)
-	if err := os.MkdirAll(storageDir, 0755); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create storage dir"})
-		return
+	var filePath string
+	var fileSize int64
+
+	if h.storage != nil {
+		// Upload product file to S3 (private)
+		fileKey := "products/" + productID + "/" + fileName
+		if err := h.storage.UploadPrivate(c.Request.Context(), fileKey, productFile, header.Size); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to upload file to storage"})
+			return
+		}
+		filePath = storage.ToPath(fileKey)
+		fileSize = header.Size
+	} else {
+		// Local fallback (development)
+		storageDir := filepath.Join(h.cfg.StorageDir, "products", productID)
+		if err := os.MkdirAll(storageDir, 0755); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create storage dir"})
+			return
+		}
+		filePath = filepath.Join(storageDir, fileName)
+		dst, err := os.Create(filePath)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save file"})
+			return
+		}
+		fileSize, _ = io.Copy(dst, productFile)
+		dst.Close()
 	}
-	filePath := filepath.Join(storageDir, fileName)
-	dst, err := os.Create(filePath)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save file"})
-		return
-	}
-	fileSize, _ := io.Copy(dst, productFile)
-	dst.Close()
 
 	var thumbnailURL string
 	if thumbFile, thumbHeader, err := c.Request.FormFile("thumbnail"); err == nil {
 		defer thumbFile.Close()
 		thumbName := productID + filepath.Ext(thumbHeader.Filename)
-		thumbPath := filepath.Join(h.cfg.UploadDir, "thumbnails", thumbName)
-		if out, err := os.Create(thumbPath); err == nil {
-			io.Copy(out, thumbFile)
-			out.Close()
-			thumbnailURL = "/uploads/thumbnails/" + thumbName
+		if h.storage != nil {
+			ct := mime.TypeByExtension(filepath.Ext(thumbHeader.Filename))
+			if ct == "" {
+				ct = "image/jpeg"
+			}
+			url, err := h.storage.UploadPublic(c.Request.Context(), "thumbnails/"+thumbName, thumbFile, thumbHeader.Size, ct)
+			if err == nil {
+				thumbnailURL = url
+			}
+		} else {
+			thumbPath := filepath.Join(h.cfg.UploadDir, "thumbnails", thumbName)
+			if out, err := os.Create(thumbPath); err == nil {
+				io.Copy(out, thumbFile)
+				out.Close()
+				thumbnailURL = "/uploads/thumbnails/" + thumbName
+			}
 		}
 	}
 
@@ -123,11 +154,22 @@ func (h *AdminHandler) CreateProduct(c *gin.Context) {
 			}
 			previewFile, _ := fh.Open()
 			previewName := fmt.Sprintf("%s_%d%s", productID, i, filepath.Ext(fh.Filename))
-			previewPath := filepath.Join(h.cfg.UploadDir, "previews", previewName)
-			if out, err := os.Create(previewPath); err == nil {
-				io.Copy(out, previewFile)
-				out.Close()
-				previewURLs = append(previewURLs, "/uploads/previews/"+previewName)
+			if h.storage != nil {
+				ct := mime.TypeByExtension(filepath.Ext(fh.Filename))
+				if ct == "" {
+					ct = "image/jpeg"
+				}
+				url, err := h.storage.UploadPublic(c.Request.Context(), "previews/"+previewName, previewFile, fh.Size, ct)
+				if err == nil {
+					previewURLs = append(previewURLs, url)
+				}
+			} else {
+				previewPath := filepath.Join(h.cfg.UploadDir, "previews", previewName)
+				if out, err := os.Create(previewPath); err == nil {
+					io.Copy(out, previewFile)
+					out.Close()
+					previewURLs = append(previewURLs, "/uploads/previews/"+previewName)
+				}
 			}
 			previewFile.Close()
 		}
@@ -144,14 +186,25 @@ func (h *AdminHandler) CreateProduct(c *gin.Context) {
 	var trailerURL string
 	if trailerFile, trailerHeader, err := c.Request.FormFile("trailer"); err == nil {
 		defer trailerFile.Close()
-		trailerDir := filepath.Join(h.cfg.UploadDir, "trailers")
-		if err := os.MkdirAll(trailerDir, 0755); err == nil {
-			trailerName := productID + filepath.Ext(trailerHeader.Filename)
-			trailerPath := filepath.Join(trailerDir, trailerName)
-			if out, err := os.Create(trailerPath); err == nil {
-				io.Copy(out, trailerFile)
-				out.Close()
-				trailerURL = "/uploads/trailers/" + trailerName
+		trailerName := productID + filepath.Ext(trailerHeader.Filename)
+		if h.storage != nil {
+			ct := mime.TypeByExtension(filepath.Ext(trailerHeader.Filename))
+			if ct == "" {
+				ct = "video/mp4"
+			}
+			url, err := h.storage.UploadPublic(c.Request.Context(), "trailers/"+trailerName, trailerFile, trailerHeader.Size, ct)
+			if err == nil {
+				trailerURL = url
+			}
+		} else {
+			trailerDir := filepath.Join(h.cfg.UploadDir, "trailers")
+			if err := os.MkdirAll(trailerDir, 0755); err == nil {
+				trailerPath := filepath.Join(trailerDir, trailerName)
+				if out, err := os.Create(trailerPath); err == nil {
+					io.Copy(out, trailerFile)
+					out.Close()
+					trailerURL = "/uploads/trailers/" + trailerName
+				}
 			}
 		}
 	}

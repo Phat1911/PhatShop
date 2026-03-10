@@ -1,9 +1,11 @@
 package handlers
 
 import (
+	"io"
 	"net/http"
 	"os"
 	"phatshop-backend/internal/repository"
+	"phatshop-backend/internal/storage"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -11,10 +13,11 @@ import (
 
 type DownloadHandler struct {
 	downloads *repository.DownloadRepo
+	storage   *storage.Client // nil when S3 not configured
 }
 
-func NewDownloadHandler(downloads *repository.DownloadRepo) *DownloadHandler {
-	return &DownloadHandler{downloads: downloads}
+func NewDownloadHandler(downloads *repository.DownloadRepo, storage *storage.Client) *DownloadHandler {
+	return &DownloadHandler{downloads: downloads, storage: storage}
 }
 
 func (h *DownloadHandler) RequestToken(c *gin.Context) {
@@ -76,6 +79,26 @@ func (h *DownloadHandler) ServeFile(c *gin.Context) {
 		return
 	}
 
+	if storage.IsS3Key(t.FilePath) {
+		// S3-backed file — stream through backend using the stored key
+		if h.storage == nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "storage not configured"})
+			return
+		}
+		key := storage.ToKey(t.FilePath)
+		obj, err := h.storage.GetObject(c.Request.Context(), key)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "file not found on server"})
+			return
+		}
+		defer obj.Close()
+		h.downloads.IncrementUsage(c.Request.Context(), t.TokenID)
+		c.Header("Content-Disposition", `attachment; filename="`+t.FileName+`"`)
+		io.Copy(c.Writer, obj)
+		return
+	}
+
+	// Local file fallback (development)
 	if _, err := os.Stat(t.FilePath); os.IsNotExist(err) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "file not found on server"})
 		return

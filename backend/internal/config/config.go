@@ -27,6 +27,13 @@ type Config struct {
 	AdminEmail      string // Seed admin email
 	AdminUsername   string // Seed admin username
 	AdminPassword   string // Seed admin password
+	// S3-compatible object storage (Cloudflare R2, AWS S3, etc.)
+	S3Endpoint   string
+	S3AccessKey  string
+	S3SecretKey  string
+	S3Bucket     string
+	S3PublicBase string // Public base URL for media files, e.g. https://pub-xxx.r2.dev
+	S3UseSSL     bool
 }
 
 func Load() *Config {
@@ -55,6 +62,12 @@ func Load() *Config {
 		AdminEmail:      getEnv("ADMIN_EMAIL", ""),
 		AdminUsername:   getEnv("ADMIN_USERNAME", "admin"),
 		AdminPassword:   getEnv("ADMIN_PASSWORD", ""),
+		S3Endpoint:      getEnv("S3_ENDPOINT", ""),
+		S3AccessKey:     getEnv("S3_ACCESS_KEY", ""),
+		S3SecretKey:     getEnv("S3_SECRET_KEY", ""),
+		S3Bucket:        getEnv("S3_BUCKET", ""),
+		S3PublicBase:    getEnv("S3_PUBLIC_BASE", ""),
+		S3UseSSL:        getEnv("S3_USE_SSL", "true") != "false",
 	}
 
 	if cfg.JWTSecret == "" {

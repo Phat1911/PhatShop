@@ -9,6 +9,7 @@ import (
 	"phatshop-backend/internal/middleware"
 	"phatshop-backend/internal/repository"
 	"phatshop-backend/internal/services"
+	"phatshop-backend/internal/storage"
 
 	"github.com/gin-gonic/gin"
 )
@@ -42,6 +43,20 @@ func main() {
 	// Services
 	ocrService := services.NewOCRService(cfg.GeminiAPIKey)
 
+	// Object storage (Cloudflare R2 / AWS S3 / etc.)
+	var storageClient *storage.Client
+	if cfg.S3Endpoint != "" && cfg.S3Bucket != "" {
+		sc, err := storage.New(cfg.S3Endpoint, cfg.S3AccessKey, cfg.S3SecretKey, cfg.S3Bucket, cfg.S3PublicBase, cfg.S3UseSSL)
+		if err != nil {
+			log.Printf("Warning: failed to initialize storage client: %v", err)
+		} else {
+			storageClient = sc
+			log.Printf("Object storage initialized: bucket=%s", cfg.S3Bucket)
+		}
+	} else {
+		log.Println("Warning: S3 storage not configured — files will be stored locally (not persistent on Railway)")
+	}
+
 	// Handlers
 	authHandler     := handlers.NewAuthHandler(userRepo, cfg)
 	userHandler     := handlers.NewUserHandler(userRepo)
@@ -49,9 +64,9 @@ func main() {
 	cartHandler     := handlers.NewCartHandler(cartRepo, productRepo)
 	orderHandler    := handlers.NewOrderHandler(orderRepo, cartRepo, productRepo)
 	paymentHandler  := handlers.NewPaymentHandler(orderRepo, cfg)
-	downloadHandler := handlers.NewDownloadHandler(downloadRepo)
+	downloadHandler := handlers.NewDownloadHandler(downloadRepo, storageClient)
 	receiptHandler  := handlers.NewReceiptHandler(receiptRepo, orderRepo, ocrService, cfg)
-	adminHandler    := handlers.NewAdminHandler(productRepo, categoryRepo, orderRepo, userRepo, cfg)
+	adminHandler    := handlers.NewAdminHandler(productRepo, categoryRepo, orderRepo, userRepo, cfg, storageClient)
 
 	r := gin.Default()
 	r.Use(middleware.CORS())
