@@ -168,14 +168,9 @@ func (d *DB) Migrate(ctx context.Context) error {
 	return nil
 }
 
-// SeedAdmin creates the admin user if it doesn't already exist.
+// SeedAdmin creates the admin user if it doesn't already exist, or updates password if username exists.
 func (d *DB) SeedAdmin(ctx context.Context, email, username, password string) error {
 	if email == "" || password == "" {
-		return nil
-	}
-	var exists bool
-	d.Pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM users WHERE email=$1)`, email).Scan(&exists)
-	if exists {
 		return nil
 	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
@@ -183,12 +178,17 @@ func (d *DB) SeedAdmin(ctx context.Context, email, username, password string) er
 		return err
 	}
 	_, err = d.Pool.Exec(ctx,
-		`INSERT INTO users (username, email, password_hash, role) VALUES ($1, $2, $3, 'admin')`,
+		`INSERT INTO users (username, email, password_hash, role, is_active)
+		 VALUES ($1, $2, $3, 'admin', true)
+		 ON CONFLICT (username) DO UPDATE
+		   SET password_hash = EXCLUDED.password_hash,
+		       role = 'admin',
+		       is_active = true`,
 		username, email, string(hash),
 	)
 	if err != nil {
 		return fmt.Errorf("seed admin error: %w", err)
 	}
-	log.Printf("Admin user created: %s", email)
+	log.Printf("Admin user seeded: %s", username)
 	return nil
 }
