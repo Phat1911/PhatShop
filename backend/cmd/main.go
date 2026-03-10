@@ -26,6 +26,10 @@ func main() {
 		log.Fatalf("Failed to migrate database: %v", err)
 	}
 
+	if err := database.SeedAdmin(context.Background(), cfg.AdminEmail, cfg.AdminUsername, cfg.AdminPassword); err != nil {
+		log.Printf("Warning: failed to seed admin: %v", err)
+	}
+
 	// Repositories
 	userRepo     := repository.NewUserRepo(database.Pool)
 	categoryRepo := repository.NewCategoryRepo(database.Pool)

@@ -24,6 +24,9 @@ type Config struct {
 	GeminiAPIKey    string // Google Gemini API key for receipt OCR
 	BankAccountNo   string // Expected receiver bank account number
 	BankAccountName string // Expected receiver account name
+	AdminEmail      string // Seed admin email
+	AdminUsername   string // Seed admin username
+	AdminPassword   string // Seed admin password
 }
 
 func Load() *Config {
@@ -49,6 +52,9 @@ func Load() *Config {
 		GeminiAPIKey:    getEnv("GEMINI_API_KEY", ""),
 		BankAccountNo:   getEnv("BANK_ACCOUNT_NO", ""),
 		BankAccountName: getEnv("BANK_ACCOUNT_NAME", ""),
+		AdminEmail:      getEnv("ADMIN_EMAIL", ""),
+		AdminUsername:   getEnv("ADMIN_USERNAME", "admin"),
+		AdminPassword:   getEnv("ADMIN_PASSWORD", ""),
 	}
 
 	if cfg.JWTSecret == "" {
