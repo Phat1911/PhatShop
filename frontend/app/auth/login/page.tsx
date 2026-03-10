@@ -21,7 +21,7 @@ export default function LoginPage() {
       const { data } = await api.post('/auth/login', { email, password });
       setAuth(data.user, data.token);
       toast.success('Đăng nhập thành công!');
-      router.push('/products');
+      router.push(data.user.role === 'admin' ? '/admin' : '/products');
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Đăng nhập thất bại';
       toast.error(msg);
