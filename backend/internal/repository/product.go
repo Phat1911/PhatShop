@@ -41,7 +41,9 @@ func (r *ProductRepo) List(ctx context.Context, f ProductFilter) ([]models.Produ
 	var args []interface{}
 	argIdx := 1
 
-	conditions = append(conditions, "p.is_published = true")
+	if !f.AdminView {
+		conditions = append(conditions, "p.is_published = true")
+	}
 
 	if f.ProductType != "" {
 		conditions = append(conditions, fmt.Sprintf("p.product_type = $%d", argIdx))
@@ -192,7 +194,7 @@ func (r *ProductRepo) Create(ctx context.Context, p *models.Product) (*models.Pr
 			(id, seller_id, category_id, title, slug, description, product_type,
 			 price, thumbnail_url, preview_urls, file_path, file_name, file_size,
 			 tags, trailer_url, is_published, created_at, updated_at)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,false,NOW(),NOW())`,
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,true,NOW(),NOW())`,
 		p.ID, p.SellerID, p.CategoryID, p.Title, p.Slug, p.Description, p.ProductType,
 		p.Price, p.ThumbnailURL, p.PreviewURLs, p.FilePath, p.FileName, p.FileSize, p.Tags, p.TrailerURL,
 	)

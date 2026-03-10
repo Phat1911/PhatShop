@@ -17,6 +17,8 @@
 
 * { box-sizing: border-box; }
 
+input, select, textarea { color: black; }
+
 body {
   color: var(--text-primary);
   background: var(--bg-primary);
