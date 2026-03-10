@@ -43,7 +43,7 @@ func main() {
 	userHandler     := handlers.NewUserHandler(userRepo)
 	productHandler  := handlers.NewProductHandler(productRepo, categoryRepo)
 	cartHandler     := handlers.NewCartHandler(cartRepo, productRepo)
-	orderHandler    := handlers.NewOrderHandler(orderRepo, cartRepo)
+	orderHandler    := handlers.NewOrderHandler(orderRepo, cartRepo, productRepo)
 	paymentHandler  := handlers.NewPaymentHandler(orderRepo, cfg)
 	downloadHandler := handlers.NewDownloadHandler(downloadRepo)
 	receiptHandler  := handlers.NewReceiptHandler(receiptRepo, orderRepo, ocrService, cfg)

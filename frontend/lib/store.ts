@@ -9,6 +9,7 @@ export interface User {
   avatar_url: string;
   role: string;
   created_at: string;
+  is_verified?: boolean;
 }
 
 interface AuthState {
@@ -35,14 +36,19 @@ export const useAuthStore = create<AuthState>((set) => ({
   setLoading: (loading) => set({ isLoading: loading }),
 }));
 
+// CartItem matches the nested backend response: items[].product.*
 export interface CartItem {
   id: string;
   product_id: string;
-  title: string;
-  thumbnail_url: string;
-  product_type: string;
-  price: number;
-  seller_name: string;
+  product: {
+    id: string;
+    title: string;
+    thumbnail_url: string;
+    product_type: string;
+    price: number;
+    seller_name: string;
+    trailer_url?: string;
+  };
 }
 
 interface CartState {

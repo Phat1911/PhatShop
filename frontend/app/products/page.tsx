@@ -45,7 +45,7 @@ function ProductsContent() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
+    <div className="max-w-7xl mx-auto px-4 py-8 animate-fade-in">
       <div className="flex flex-col sm:flex-row gap-4 mb-6">
         <input
           type="text"
@@ -53,12 +53,12 @@ function ProductsContent() {
           onChange={(e) => setSearchInput(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && setParam('search', searchInput)}
           placeholder="Tìm kiếm sản phẩm..."
-          className="border border-gray-300 rounded-lg px-4 py-2 text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          className="bg-[#16161e] border border-[#1f1f2e] text-gray-100 placeholder-gray-500 rounded-lg px-4 py-2 text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-[#2563eb] transition-shadow"
         />
         <select
           value={sort}
           onChange={(e) => setParam('sort', e.target.value)}
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none"
+          className="bg-[#16161e] border border-[#1f1f2e] text-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563eb]"
         >
           {SORTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
         </select>
@@ -69,7 +69,11 @@ function ProductsContent() {
           <button
             key={t.value}
             onClick={() => setParam('type', t.value)}
-            className={`px-4 py-1.5 rounded-full text-sm font-medium border transition-colors ${type === t.value ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-600 border-gray-300 hover:border-indigo-400'}`}
+            className={`px-4 py-1.5 rounded-full text-sm font-medium border transition-all duration-200 ${
+              type === t.value
+                ? 'bg-[#e63946] text-white border-[#e63946] shadow-lg shadow-[#e63946]/20'
+                : 'bg-transparent text-gray-400 border-[#1f1f2e] hover:border-[#2563eb] hover:text-[#60a5fa]'
+            }`}
           >
             {t.label}
           </button>
@@ -79,13 +83,17 @@ function ProductsContent() {
       {isLoading ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
           {[...Array(8)].map((_, i) => (
-            <div key={i} className="bg-white rounded-xl aspect-[4/5] animate-pulse" />
+            <div key={i} className="skeleton rounded-xl aspect-[4/5]" />
           ))}
         </div>
       ) : (
         <>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-            {(data?.data || []).map((p: Product) => <ProductCard key={p.id} product={p} />)}
+            {(data?.data || []).map((p: Product, i: number) => (
+              <div key={p.id} style={{ animationDelay: `${i * 40}ms` }}>
+                <ProductCard product={p} />
+              </div>
+            ))}
           </div>
           {data?.data?.length === 0 && (
             <p className="text-center text-gray-500 py-16">Không tìm thấy sản phẩm nào</p>
@@ -96,7 +104,7 @@ function ProductsContent() {
                 <button
                   key={i}
                   onClick={() => { const p = new URLSearchParams(searchParams.toString()); p.set('page', String(i + 1)); router.push('?' + p.toString()); }}
-                  className={`w-8 h-8 rounded text-sm ${page === i + 1 ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 border border-gray-300'}`}
+                  className={`w-8 h-8 rounded text-sm transition-colors ${page === i + 1 ? 'bg-[#e63946] text-white' : 'bg-[#16161e] text-gray-400 border border-[#1f1f2e] hover:border-[#2563eb]'}`}
                 >
                   {i + 1}
                 </button>

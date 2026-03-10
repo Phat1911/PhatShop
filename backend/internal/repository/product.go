@@ -36,66 +36,75 @@ func (r *ProductRepo) List(ctx context.Context, f ProductFilter) ([]models.Produ
 	if f.Limit < 1 || f.Limit > 100 {
 		f.Limit = 20
 	}
-	offset := (f.Page - 1) * f.Limit
 
-	where := []string{}
-	args := []interface{}{}
-	idx := 1
+	var conditions []string
+	var args []interface{}
+	argIdx := 1
 
-	if !f.AdminView {
-		where = append(where, "p.is_published = TRUE")
-	}
+	conditions = append(conditions, "p.is_published = true")
+
 	if f.ProductType != "" {
-		where = append(where, fmt.Sprintf("p.product_type = $%d", idx))
+		conditions = append(conditions, fmt.Sprintf("p.product_type = $%d", argIdx))
 		args = append(args, f.ProductType)
-		idx++
+		argIdx++
 	}
 	if f.CategoryID != "" {
-		where = append(where, fmt.Sprintf("p.category_id = $%d", idx))
+		conditions = append(conditions, fmt.Sprintf("p.category_id = $%d", argIdx))
 		args = append(args, f.CategoryID)
-		idx++
+		argIdx++
 	}
 	if f.Search != "" {
-		where = append(where, fmt.Sprintf("(p.title ILIKE $%d OR p.description ILIKE $%d)", idx, idx))
-		args = append(args, "%"+f.Search+"%")
-		idx++
+		conditions = append(conditions, fmt.Sprintf(
+			"(p.title ILIKE $%d OR p.description ILIKE $%d OR $%d = ANY(p.tags))",
+			argIdx, argIdx+1, argIdx+2))
+		like := "%" + f.Search + "%"
+		args = append(args, like, like, f.Search)
+		argIdx += 3
 	}
 
-	whereClause := ""
-	if len(where) > 0 {
-		whereClause = "WHERE " + strings.Join(where, " AND ")
+	where := ""
+	if len(conditions) > 0 {
+		where = "WHERE " + strings.Join(conditions, " AND ")
 	}
 
 	orderBy := "p.created_at DESC"
 	switch f.Sort {
-	case "oldest":
-		orderBy = "p.created_at ASC"
 	case "price_asc":
 		orderBy = "p.price ASC"
 	case "price_desc":
 		orderBy = "p.price DESC"
 	case "popular":
 		orderBy = "p.purchase_count DESC"
+	case "views":
+		orderBy = "p.view_count DESC"
 	}
 
-	var total int
-	r.pool.QueryRow(ctx, fmt.Sprintf(`SELECT COUNT(*) FROM products p %s`, whereClause), args...).Scan(&total)
+	countQuery := fmt.Sprintf(`
+		SELECT COUNT(*) FROM products p
+		LEFT JOIN users u ON u.id = p.seller_id
+		%s`, where)
 
+	var total int
+	if err := r.pool.QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
+	offset := (f.Page - 1) * f.Limit
 	args = append(args, f.Limit, offset)
+
 	query := fmt.Sprintf(`
-		SELECT p.id, p.seller_id, p.category_id, p.title, p.slug, p.description,
-		       p.product_type, p.price, p.thumbnail_url, p.preview_urls,
-		       p.file_path, p.file_name, p.file_size, p.tags,
-		       p.is_published, p.view_count, p.purchase_count, p.created_at, p.updated_at,
-		       COALESCE(u.username, '') as seller_name,
-		       COALESCE(c.name, '') as category_name
+		SELECT p.id, p.seller_id, p.category_id, p.title, p.slug, p.description, p.product_type,
+		       p.price, p.thumbnail_url, p.preview_urls, p.file_path, p.file_name, p.file_size,
+		       p.tags, p.is_published, p.view_count, p.purchase_count, p.created_at, p.updated_at,
+		       COALESCE(u.display_name, u.username, '') as seller_name,
+		       COALESCE(c.name, '') as category_name,
+		       COALESCE(p.trailer_url, '') as trailer_url
 		FROM products p
 		LEFT JOIN users u ON u.id = p.seller_id
 		LEFT JOIN categories c ON c.id = p.category_id
 		%s
 		ORDER BY %s
-		LIMIT $%d OFFSET $%d`,
-		whereClause, orderBy, idx, idx+1)
+		LIMIT $%d OFFSET $%d`, where, orderBy, argIdx, argIdx+1)
 
 	rows, err := r.pool.Query(ctx, query, args...)
 	if err != nil {
@@ -106,13 +115,13 @@ func (r *ProductRepo) List(ctx context.Context, f ProductFilter) ([]models.Produ
 	var products []models.Product
 	for rows.Next() {
 		var p models.Product
-		if err := rows.Scan(
-			&p.ID, &p.SellerID, &p.CategoryID, &p.Title, &p.Slug, &p.Description,
-			&p.ProductType, &p.Price, &p.ThumbnailURL, &p.PreviewURLs,
-			&p.FilePath, &p.FileName, &p.FileSize, &p.Tags,
-			&p.IsPublished, &p.ViewCount, &p.PurchaseCount, &p.CreatedAt, &p.UpdatedAt,
-			&p.SellerName, &p.CategoryName,
-		); err != nil {
+		err := rows.Scan(
+			&p.ID, &p.SellerID, &p.CategoryID, &p.Title, &p.Slug, &p.Description, &p.ProductType,
+			&p.Price, &p.ThumbnailURL, &p.PreviewURLs, &p.FilePath, &p.FileName, &p.FileSize,
+			&p.Tags, &p.IsPublished, &p.ViewCount, &p.PurchaseCount, &p.CreatedAt, &p.UpdatedAt,
+			&p.SellerName, &p.CategoryName, &p.TrailerURL,
+		)
+		if err != nil {
 			return nil, 0, err
 		}
 		p.FilePath = ""
@@ -127,22 +136,20 @@ func (r *ProductRepo) List(ctx context.Context, f ProductFilter) ([]models.Produ
 func (r *ProductRepo) GetByID(ctx context.Context, id string) (*models.Product, error) {
 	var p models.Product
 	err := r.pool.QueryRow(ctx, `
-		SELECT p.id, p.seller_id, p.category_id, p.title, p.slug, p.description,
-		       p.product_type, p.price, p.thumbnail_url, p.preview_urls,
-		       p.file_path, p.file_name, p.file_size, p.tags,
-		       p.is_published, p.view_count, p.purchase_count, p.created_at, p.updated_at,
-		       COALESCE(u.username, '') as seller_name,
-		       COALESCE(c.name, '') as category_name
+		SELECT p.id, p.seller_id, p.category_id, p.title, p.slug, p.description, p.product_type,
+		       p.price, p.thumbnail_url, p.preview_urls, p.file_path, p.file_name, p.file_size,
+		       p.tags, p.is_published, p.view_count, p.purchase_count, p.created_at, p.updated_at,
+		       COALESCE(u.display_name, u.username, '') as seller_name,
+		       COALESCE(c.name, '') as category_name,
+		       COALESCE(p.trailer_url, '') as trailer_url
 		FROM products p
 		LEFT JOIN users u ON u.id = p.seller_id
 		LEFT JOIN categories c ON c.id = p.category_id
-		WHERE p.id = $1`, id,
-	).Scan(
-		&p.ID, &p.SellerID, &p.CategoryID, &p.Title, &p.Slug, &p.Description,
-		&p.ProductType, &p.Price, &p.ThumbnailURL, &p.PreviewURLs,
-		&p.FilePath, &p.FileName, &p.FileSize, &p.Tags,
-		&p.IsPublished, &p.ViewCount, &p.PurchaseCount, &p.CreatedAt, &p.UpdatedAt,
-		&p.SellerName, &p.CategoryName,
+		WHERE p.id = $1`, id).Scan(
+		&p.ID, &p.SellerID, &p.CategoryID, &p.Title, &p.Slug, &p.Description, &p.ProductType,
+		&p.Price, &p.ThumbnailURL, &p.PreviewURLs, &p.FilePath, &p.FileName, &p.FileSize,
+		&p.Tags, &p.IsPublished, &p.ViewCount, &p.PurchaseCount, &p.CreatedAt, &p.UpdatedAt,
+		&p.SellerName, &p.CategoryName, &p.TrailerURL,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -153,64 +160,22 @@ func (r *ProductRepo) GetByID(ctx context.Context, id string) (*models.Product, 
 	return &p, nil
 }
 
-func (r *ProductRepo) Create(ctx context.Context, p *models.Product) (*models.Product, error) {
-	var created models.Product
-	err := r.pool.QueryRow(ctx, `
-		INSERT INTO products (seller_id, category_id, title, slug, description, product_type, price,
-		                      thumbnail_url, preview_urls, file_path, file_name, file_size, tags)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
-		RETURNING id, seller_id, category_id, title, slug, description, product_type, price,
-		          thumbnail_url, preview_urls, file_path, file_name, file_size, tags,
-		          is_published, view_count, purchase_count, created_at, updated_at`,
-		p.SellerID, p.CategoryID, p.Title, p.Slug, p.Description, p.ProductType, p.Price,
-		p.ThumbnailURL, p.PreviewURLs, p.FilePath, p.FileName, p.FileSize, p.Tags,
-	).Scan(
-		&created.ID, &created.SellerID, &created.CategoryID, &created.Title, &created.Slug, &created.Description,
-		&created.ProductType, &created.Price, &created.ThumbnailURL, &created.PreviewURLs,
-		&created.FilePath, &created.FileName, &created.FileSize, &created.Tags,
-		&created.IsPublished, &created.ViewCount, &created.PurchaseCount, &created.CreatedAt, &created.UpdatedAt,
-	)
-	created.FilePath = ""
-	return &created, err
+// IncrementView uses context.Background() so it survives after the request context is cancelled.
+func (r *ProductRepo) IncrementView(id string) {
+	r.pool.Exec(context.Background(), `UPDATE products SET view_count = view_count + 1 WHERE id=$1`, id)
 }
 
-func (r *ProductRepo) Update(ctx context.Context, id string, p *models.Product) (*models.Product, error) {
-	var updated models.Product
-	err := r.pool.QueryRow(ctx, `
-		UPDATE products SET category_id=$2, title=$3, slug=$4, description=$5,
-		                    product_type=$6, price=$7, tags=$8, updated_at=NOW()
-		WHERE id=$1
-		RETURNING id, seller_id, category_id, title, slug, description, product_type, price,
-		          thumbnail_url, preview_urls, file_path, file_name, file_size, tags,
-		          is_published, view_count, purchase_count, created_at, updated_at`,
-		id, p.CategoryID, p.Title, p.Slug, p.Description, p.ProductType, p.Price, p.Tags,
-	).Scan(
-		&updated.ID, &updated.SellerID, &updated.CategoryID, &updated.Title, &updated.Slug, &updated.Description,
-		&updated.ProductType, &updated.Price, &updated.ThumbnailURL, &updated.PreviewURLs,
-		&updated.FilePath, &updated.FileName, &updated.FileSize, &updated.Tags,
-		&updated.IsPublished, &updated.ViewCount, &updated.PurchaseCount, &updated.CreatedAt, &updated.UpdatedAt,
-	)
-	updated.FilePath = ""
-	return &updated, err
-}
-
-func (r *ProductRepo) Delete(ctx context.Context, id string) error {
-	_, err := r.pool.Exec(ctx, `DELETE FROM products WHERE id=$1`, id)
-	return err
-}
-
-func (r *ProductRepo) SetPublished(ctx context.Context, id string, published bool) error {
-	_, err := r.pool.Exec(ctx, `UPDATE products SET is_published=$2, updated_at=NOW() WHERE id=$1`, id, published)
-	return err
-}
-
-func (r *ProductRepo) IncrementView(ctx context.Context, id string) {
-	r.pool.Exec(ctx, `UPDATE products SET view_count = view_count + 1 WHERE id=$1`, id)
+// IncrementPurchaseCount increments purchase_count for a list of product IDs.
+func (r *ProductRepo) IncrementPurchaseCount(ctx context.Context, productIDs []string) {
+	for _, pid := range productIDs {
+		r.pool.Exec(context.Background(), `UPDATE products SET purchase_count = purchase_count + 1 WHERE id=$1`, pid)
+	}
 }
 
 func (r *ProductRepo) GetFilePath(ctx context.Context, id string) (string, string, error) {
 	var filePath, fileName string
-	err := r.pool.QueryRow(ctx, `SELECT file_path, file_name FROM products WHERE id=$1`, id).Scan(&filePath, &fileName)
+	err := r.pool.QueryRow(ctx,
+		`SELECT file_path, file_name FROM products WHERE id=$1`, id).Scan(&filePath, &fileName)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return "", "", nil
@@ -218,4 +183,33 @@ func (r *ProductRepo) GetFilePath(ctx context.Context, id string) (string, strin
 		return "", "", err
 	}
 	return filePath, fileName, nil
+}
+
+// Create inserts a new product record.
+func (r *ProductRepo) Create(ctx context.Context, p *models.Product) (*models.Product, error) {
+	_, err := r.pool.Exec(ctx, `
+		INSERT INTO products
+			(id, seller_id, category_id, title, slug, description, product_type,
+			 price, thumbnail_url, preview_urls, file_path, file_name, file_size,
+			 tags, trailer_url, is_published, created_at, updated_at)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,false,NOW(),NOW())`,
+		p.ID, p.SellerID, p.CategoryID, p.Title, p.Slug, p.Description, p.ProductType,
+		p.Price, p.ThumbnailURL, p.PreviewURLs, p.FilePath, p.FileName, p.FileSize, p.Tags, p.TrailerURL,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return r.GetByID(ctx, p.ID)
+}
+
+// Delete removes a product and its associated file from storage.
+func (r *ProductRepo) Delete(ctx context.Context, id string) error {
+	_, err := r.pool.Exec(ctx, `DELETE FROM products WHERE id=$1`, id)
+	return err
+}
+
+// SetPublished toggles the is_published flag on a product.
+func (r *ProductRepo) SetPublished(ctx context.Context, id string, published bool) error {
+	_, err := r.pool.Exec(ctx, `UPDATE products SET is_published=$2, updated_at=NOW() WHERE id=$1`, id, published)
+	return err
 }

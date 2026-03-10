@@ -20,7 +20,7 @@ func (r *CartRepo) GetItems(ctx context.Context, userID string) ([]models.CartIt
 		SELECT ci.id, ci.user_id, ci.product_id, ci.created_at,
 		       p.id, p.seller_id, p.category_id, p.title, p.slug, p.description, p.product_type,
 		       p.price, p.thumbnail_url, p.preview_urls, p.file_path, p.file_name, p.file_size,
-		       p.tags, p.is_published, p.view_count, p.purchase_count, p.created_at, p.updated_at
+		       p.tags, p.is_published, p.view_count, p.purchase_count, p.trailer_url, p.created_at, p.updated_at
 		FROM cart_items ci
 		JOIN products p ON p.id = ci.product_id
 		WHERE ci.user_id = $1
@@ -39,7 +39,7 @@ func (r *CartRepo) GetItems(ctx context.Context, userID string) ([]models.CartIt
 			&ci.ID, &ci.UserID, &ci.ProductID, &ci.CreatedAt,
 			&p.ID, &p.SellerID, &p.CategoryID, &p.Title, &p.Slug, &p.Description, &p.ProductType,
 			&p.Price, &p.ThumbnailURL, &p.PreviewURLs, &p.FilePath, &p.FileName, &p.FileSize,
-			&p.Tags, &p.IsPublished, &p.ViewCount, &p.PurchaseCount, &p.CreatedAt, &p.UpdatedAt,
+			&p.Tags, &p.IsPublished, &p.ViewCount, &p.PurchaseCount, &p.TrailerURL, &p.CreatedAt, &p.UpdatedAt,
 		)
 		if err != nil {
 			return nil, 0, err

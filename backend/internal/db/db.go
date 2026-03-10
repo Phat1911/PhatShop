@@ -71,7 +71,8 @@ func (d *DB) Migrate(ctx context.Context) error {
 			view_count     INT          DEFAULT 0,
 			purchase_count INT          DEFAULT 0,
 			created_at     TIMESTAMPTZ  DEFAULT NOW(),
-			updated_at     TIMESTAMPTZ  DEFAULT NOW()
+			updated_at     TIMESTAMPTZ  DEFAULT NOW(),
+			trailer_url    TEXT         DEFAULT ''
 		)`,
 		`CREATE TABLE IF NOT EXISTS orders (
 			id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -137,6 +138,8 @@ func (d *DB) Migrate(ctx context.Context) error {
 		`CREATE INDEX IF NOT EXISTS idx_products_category  ON products(category_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_products_published ON products(is_published)`,
 		`CREATE INDEX IF NOT EXISTS idx_products_created   ON products(created_at DESC)`,
+		// Add trailer_url column if not exists (safe migration)
+		`ALTER TABLE products ADD COLUMN IF NOT EXISTS trailer_url TEXT DEFAULT ''`,
 		`CREATE INDEX IF NOT EXISTS idx_orders_buyer       ON orders(buyer_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_orders_status      ON orders(status)`,
 		`CREATE INDEX IF NOT EXISTS idx_orders_txn_ref     ON orders(vnpay_txn_ref)`,

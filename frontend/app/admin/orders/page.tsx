@@ -6,7 +6,6 @@ import PriceTag from '@/components/PriceTag';
 import dayjs from 'dayjs';
 import clsx from 'clsx';
 import toast from 'react-hot-toast';
-import Link from 'next/link';
 
 const STATUS_MAP: Record<string, { label: string; cls: string }> = {
   pending: { label: 'Chờ TT', cls: 'bg-yellow-100 text-yellow-700' },

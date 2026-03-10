@@ -139,6 +139,7 @@ func (h *AdminHandler) CreateProduct(c *gin.Context) {
 	}
 
 	slug := toSlug(title) + "-" + productID[:8]
+	trailerURL := c.PostForm("trailer_url")
 
 	product := &models.Product{
 		ID:           productID,
@@ -155,6 +156,7 @@ func (h *AdminHandler) CreateProduct(c *gin.Context) {
 		FileName:     fileName,
 		FileSize:     fileSize,
 		Tags:         tags,
+		TrailerURL:   trailerURL,
 	}
 
 	created, err := h.products.Create(c.Request.Context(), product)

@@ -11,22 +11,26 @@ const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30000 } },
 });
 
-export default function Providers({ children }: { children: React.ReactNode }) {
-  const clearAuth = useAuthStore((s) => s.clearAuth);
-  const setAuth = useAuthStore((s) => s.setAuth);
-  const setLoading = useAuthStore((s) => s.setLoading);
+function AuthInitializer() {
+  const { setAuth, clearAuth, setLoading } = useAuthStore();
 
   useEffect(() => {
-    const token = Cookies.get('phatshop_token');
-    if (token) {
-      api.get('/users/me').then((res) => {
-        setAuth(res.data, token);
-      }).catch(() => {
+    const initAuth = async () => {
+      const token = Cookies.get('phatshop_token');
+      if (!token) {
+        setLoading(false);
+        return;
+      }
+      try {
+        const { data } = await api.get('/users/me');
+        setAuth(data, token);
+      } catch {
         clearAuth();
-      });
-    } else {
-      setLoading(false);
-    }
+      }
+    };
+
+    initAuth();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -38,8 +42,13 @@ export default function Providers({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener('phatshop:auth-expired', handle);
   }, [clearAuth]);
 
+  return null;
+}
+
+export default function Providers({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
+      <AuthInitializer />
       {children}
       <Toaster position="top-right" />
     </QueryClientProvider>

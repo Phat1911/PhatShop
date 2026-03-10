@@ -9,8 +9,17 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        background: "var(--background)",
-        foreground: "var(--foreground)",
+        background: "#0a0a0f",
+        "bg-secondary": "#111118",
+        "bg-card": "#16161e",
+        "accent-red": "#e63946",
+        "accent-blue": "#2563eb",
+        "border-dark": "#1f1f2e",
+        "text-muted": "#9ca3af",
+      },
+      animation: {
+        "fade-in": "fadeIn 0.4s ease both",
+        "slide-down": "slideDown 0.25s ease both",
       },
     },
   },

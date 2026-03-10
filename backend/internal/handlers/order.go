@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
 	"phatshop-backend/internal/repository"
 
@@ -8,12 +9,13 @@ import (
 )
 
 type OrderHandler struct {
-	orders *repository.OrderRepo
-	cart   *repository.CartRepo
+	orders   *repository.OrderRepo
+	cart     *repository.CartRepo
+	products *repository.ProductRepo
 }
 
-func NewOrderHandler(orders *repository.OrderRepo, cart *repository.CartRepo) *OrderHandler {
-	return &OrderHandler{orders: orders, cart: cart}
+func NewOrderHandler(orders *repository.OrderRepo, cart *repository.CartRepo, products *repository.ProductRepo) *OrderHandler {
+	return &OrderHandler{orders: orders, cart: cart, products: products}
 }
 
 func (h *OrderHandler) CreateOrder(c *gin.Context) {
@@ -31,6 +33,18 @@ func (h *OrderHandler) CreateOrder(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
+	// Increment purchase_count for all ordered products
+	productIDs := make([]string, 0, len(items))
+	for _, item := range items {
+		if item.Product != nil {
+			productIDs = append(productIDs, item.Product.ID)
+		}
+	}
+	if len(productIDs) > 0 {
+		go h.products.IncrementPurchaseCount(context.Background(), productIDs)
+	}
+
 	c.JSON(http.StatusCreated, order)
 }
 

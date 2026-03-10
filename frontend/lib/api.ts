@@ -17,9 +17,17 @@ api.interceptors.response.use(
   (res) => res,
   (err) => {
     if (err.response?.status === 401) {
-      Cookies.remove('phatshop_token');
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('phatshop:auth-expired'));
+      const token = Cookies.get('phatshop_token');
+      // Only fire auth-expired if we actually have a stale token
+      // (prevents wiping a freshly set token during redirect after login)
+      if (token) {
+        Cookies.remove('phatshop_token');
+        if (typeof window !== 'undefined') {
+          const isAuthPage = window.location.pathname.startsWith('/auth');
+          if (!isAuthPage) {
+            window.dispatchEvent(new CustomEvent('phatshop:auth-expired'));
+          }
+        }
       }
     }
     return Promise.reject(err);

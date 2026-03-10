@@ -56,7 +56,8 @@ func (h *ProductHandler) GetProduct(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "product not found"})
 		return
 	}
-	go h.products.IncrementView(c.Request.Context(), id)
+	// Use context.Background() via the repo method so view increment survives after response
+	go h.products.IncrementView(id)
 	c.JSON(http.StatusOK, product)
 }
 

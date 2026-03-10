@@ -41,6 +41,7 @@ type Product struct {
 	IsPublished   bool      `json:"is_published"`
 	ViewCount     int       `json:"view_count"`
 	PurchaseCount int       `json:"purchase_count"`
+	TrailerURL    string    `json:"trailer_url,omitempty"`
 	CreatedAt     time.Time `json:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at"`
 	SellerName    string    `json:"seller_name,omitempty"`
