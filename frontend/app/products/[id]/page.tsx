@@ -51,15 +51,21 @@ export default function ProductDetailPage() {
   const inCart = items.some((i) => i.product_id === id);
   const hasPurchased = purchaseCheck?.purchased === true;
   const thumb = product.thumbnail_url ? getUploadUrl(product.thumbnail_url) : null;
+  const trailerSrc = product.trailer_url ? getUploadUrl(product.trailer_url) : null;
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        {thumb && (
+        {/* Trailer video takes priority for preview; fallback to thumbnail */}
+        {trailerSrc ? (
+          <div className="relative w-full aspect-video bg-black">
+            <video src={trailerSrc} controls className="w-full h-full" />
+          </div>
+        ) : thumb ? (
           <div className="relative w-full aspect-video">
             <Image src={thumb} alt={product.title} fill className="object-cover" />
           </div>
-        )}
+        ) : null}
         <div className="p-6">
           <div className="flex items-start justify-between gap-4">
             <div>

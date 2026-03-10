@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 )
 
 // ExtractedReceipt holds structured data pulled from a bank transfer receipt image.
@@ -77,15 +78,37 @@ func (s *OCRService) ExtractFromImageFile(filePath string) (*ExtractedReceipt, e
 	body, _ := json.Marshal(reqBody)
 	url := "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + s.apiKey
 
-	resp, err := http.Post(url, "application/json", bytes.NewReader(body))
-	if err != nil {
-		return nil, fmt.Errorf("gemini request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	respBytes, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode != http.StatusOK {
+	var respBytes []byte
+	var lastStatus int
+	const maxRetries = 3
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		if attempt > 0 {
+			time.Sleep(time.Duration(attempt*2) * time.Second)
+		}
+		resp, err := http.Post(url, "application/json", bytes.NewReader(body))
+		if err != nil {
+			if attempt == maxRetries-1 {
+				return nil, fmt.Errorf("gemini request failed: %w", err)
+			}
+			continue
+		}
+		respBytes, _ = io.ReadAll(resp.Body)
+		resp.Body.Close()
+		lastStatus = resp.StatusCode
+		if resp.StatusCode == http.StatusOK {
+			break
+		}
+		// Retry on transient server errors
+		if resp.StatusCode == 503 || resp.StatusCode == 429 || resp.StatusCode == 500 {
+			if attempt == maxRetries-1 {
+				return nil, fmt.Errorf("gemini_unavailable")
+			}
+			continue
+		}
 		return nil, fmt.Errorf("gemini error %d: %s", resp.StatusCode, string(respBytes))
+	}
+	if lastStatus != http.StatusOK {
+		return nil, fmt.Errorf("gemini_unavailable")
 	}
 
 	// Parse Gemini response envelope

@@ -158,7 +158,7 @@ func (d *DB) Migrate(ctx context.Context) error {
 		}
 	}
 
-	for _, dir := range []string{"./uploads/thumbnails", "./uploads/previews", "./storage/products", "./storage/receipts"} {
+	for _, dir := range []string{"./uploads/thumbnails", "./uploads/previews", "./uploads/trailers", "./storage/products", "./storage/receipts"} {
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			log.Printf("Warning: could not create directory %s: %v", dir, err)
 		}

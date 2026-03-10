@@ -139,7 +139,22 @@ func (h *AdminHandler) CreateProduct(c *gin.Context) {
 	}
 
 	slug := toSlug(title) + "-" + productID[:8]
-	trailerURL := c.PostForm("trailer_url")
+
+	// Trailer: uploaded video file
+	var trailerURL string
+	if trailerFile, trailerHeader, err := c.Request.FormFile("trailer"); err == nil {
+		defer trailerFile.Close()
+		trailerDir := filepath.Join(h.cfg.UploadDir, "trailers")
+		if err := os.MkdirAll(trailerDir, 0755); err == nil {
+			trailerName := productID + filepath.Ext(trailerHeader.Filename)
+			trailerPath := filepath.Join(trailerDir, trailerName)
+			if out, err := os.Create(trailerPath); err == nil {
+				io.Copy(out, trailerFile)
+				out.Close()
+				trailerURL = "/uploads/trailers/" + trailerName
+			}
+		}
+	}
 
 	product := &models.Product{
 		ID:           productID,

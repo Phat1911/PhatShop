@@ -37,6 +37,7 @@ const TYPE_COLORS: Record<string, string> = {
 
 export default function ProductCard({ product }: { product: Product }) {
   const thumb = product.thumbnail_url ? getUploadUrl(product.thumbnail_url) : null;
+  const trailerSrc = product.trailer_url ? getUploadUrl(product.trailer_url) : null;
 
   return (
     <Link
@@ -50,6 +51,16 @@ export default function ProductCard({ product }: { product: Product }) {
             alt={product.title}
             fill
             className="object-cover group-hover:scale-105 transition-transform duration-300"
+          />
+        ) : trailerSrc ? (
+          <video
+            src={trailerSrc}
+            muted
+            loop
+            playsInline
+            className="absolute inset-0 w-full h-full object-cover"
+            onMouseEnter={(e) => (e.currentTarget as HTMLVideoElement).play()}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLVideoElement).pause(); (e.currentTarget as HTMLVideoElement).currentTime = 0; }}
           />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center text-gray-600 text-4xl">

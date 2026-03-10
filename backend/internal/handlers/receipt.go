@@ -120,7 +120,11 @@ func (h *ReceiptHandler) UploadReceipt(c *gin.Context) {
 	if err != nil {
 		log.Printf("[receipt] OCR error for order %s: %v", orderID, err)
 		os.Remove(imagePath)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to analyse receipt image"})
+		errMsg := "failed to analyse receipt image"
+		if strings.Contains(err.Error(), "gemini_unavailable") {
+			errMsg = "The receipt analysis service is temporarily busy. Please wait a moment and try again."
+		}
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": errMsg})
 		return
 	}
 

@@ -20,6 +20,7 @@ export default function NewProductPage() {
   });
   const [productFile, setProductFile] = useState<File | null>(null);
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
+  const [trailerFile, setTrailerFile] = useState<File | null>(null);
 
   const { data: categories } = useQuery({
     queryKey: ['admin-categories'],
@@ -37,6 +38,7 @@ export default function NewProductPage() {
       if (form.tags) fd.append('tags', form.tags);
       if (productFile) fd.append('file', productFile);
       if (thumbnailFile) fd.append('thumbnail', thumbnailFile);
+      if (trailerFile) fd.append('trailer', trailerFile);
       return api.post('/admin/products', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
     },
     onSuccess: async (res) => {
@@ -141,6 +143,27 @@ export default function NewProductPage() {
             onChange={(e) => setThumbnailFile(e.target.files?.[0] || null)}
             className="w-full text-sm text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-sm file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
           />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Video trailer / demo{' '}
+            <span className="font-normal text-gray-400">(MP4, WebM — tối đa 200MB)</span>
+          </label>
+          <input
+            type="file"
+            accept="video/*"
+            onChange={(e) => setTrailerFile(e.target.files?.[0] || null)}
+            className="w-full text-sm text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-sm file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+          />
+          {trailerFile && (
+            <div className="mt-2 rounded-lg overflow-hidden border border-gray-200 aspect-video bg-black">
+              <video
+                src={URL.createObjectURL(trailerFile)}
+                controls
+                className="w-full h-full"
+              />
+            </div>
+          )}
         </div>
         <button
           type="submit" disabled={createProduct.isPending}
