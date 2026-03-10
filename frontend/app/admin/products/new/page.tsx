@@ -39,7 +39,13 @@ export default function NewProductPage() {
       if (thumbnailFile) fd.append('thumbnail', thumbnailFile);
       return api.post('/admin/products', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
     },
-    onSuccess: () => {
+    onSuccess: async (res) => {
+      const productId = res?.data?.id;
+      if (productId) {
+        try {
+          await api.patch(`/admin/products/${productId}/publish`, { is_published: true });
+        } catch {}
+      }
       toast.success('Tạo sản phẩm thành công!');
       qc.invalidateQueries({ queryKey: ['admin-products'] });
       qc.invalidateQueries({ queryKey: ['products'] });
