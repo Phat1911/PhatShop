@@ -140,6 +140,8 @@ func (d *DB) Migrate(ctx context.Context) error {
 		`CREATE INDEX IF NOT EXISTS idx_products_created   ON products(created_at DESC)`,
 		// Add trailer_url column if not exists (safe migration)
 		`ALTER TABLE products ADD COLUMN IF NOT EXISTS trailer_url TEXT DEFAULT ''`,
+		// Publish all existing products that were accidentally created as unpublished
+		`UPDATE products SET is_published = true WHERE is_published = false`,
 		`CREATE INDEX IF NOT EXISTS idx_orders_buyer       ON orders(buyer_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_orders_status      ON orders(status)`,
 		`CREATE INDEX IF NOT EXISTS idx_orders_txn_ref     ON orders(vnpay_txn_ref)`,
