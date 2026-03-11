@@ -51,9 +51,11 @@ export default function ProductDetailPage() {
   const inCart = items.some((i) => i.product_id === id);
   const hasPurchased = purchaseCheck?.purchased === true;
   const thumb = product.thumbnail_url ? getUploadUrl(product.thumbnail_url) : null;
-  const trailerSrc = product.trailer_url ? getUploadUrl(product.trailer_url) : null;
-  // has_trailer is set by the backend when a trailer exists but the user is not signed in
-  const trailerLocked = !trailerSrc && (product.has_trailer as boolean | undefined);
+  // Only expose the trailer URL when auth is resolved AND user is signed in.
+  // This prevents cached responses (with trailer_url) from leaking to guests.
+  const trailerSrc = (product.trailer_url && !authLoading && user) ? getUploadUrl(product.trailer_url) : null;
+  // Show a locked overlay when signed out and a trailer exists (from backend flag or cached url).
+  const trailerLocked = !authLoading && !user && !!(product.has_trailer || product.trailer_url);
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
