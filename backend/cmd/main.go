@@ -88,7 +88,7 @@ func main() {
 	// Public
 	api.GET("/categories", productHandler.ListCategories)
 	api.GET("/products", productHandler.ListProducts)
-	api.GET("/products/:id", productHandler.GetProduct)
+	api.GET("/products/:id", middleware.OptionalAuth(cfg.JWTSecret), productHandler.GetProduct)
 
 	// VNPay IPN (no auth - called by VNPay server)
 	api.GET("/payments/vnpay/ipn", paymentHandler.VNPayIPN)

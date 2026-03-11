@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"phatshop-backend/internal/models"
 	"phatshop-backend/internal/repository"
 	"strconv"
 
@@ -58,6 +59,22 @@ func (h *ProductHandler) GetProduct(c *gin.Context) {
 	}
 	// Use context.Background() via the repo method so view increment survives after response
 	go h.products.IncrementView(id)
+
+	// Trailer is only visible to signed-in users.
+	_, loggedIn := c.Get("user_id")
+	if !loggedIn && product.TrailerURL != "" {
+		type productResp struct {
+			*models.Product
+			TrailerURL string `json:"trailer_url,omitempty"`
+			HasTrailer bool   `json:"has_trailer"`
+		}
+		c.JSON(http.StatusOK, productResp{
+			Product:    product,
+			HasTrailer: true,
+			TrailerURL: "",
+		})
+		return
+	}
 	c.JSON(http.StatusOK, product)
 }
 
